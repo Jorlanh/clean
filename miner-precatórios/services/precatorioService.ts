@@ -1,8 +1,8 @@
 import axios from 'axios';
-import { Precatorio, FilterState, TRIBUNAIS, ESTADOS, User } from '../types';
+import { Precatorio, FilterState, User } from '../types';
 import * as XLSX from 'xlsx';
 
-// --- CONFIGURAÇÃO DA API REAL (INCREMENTO) ---
+// --- CONFIGURAÇÃO DA API ---
 const API_URL = 'http://localhost:8080/api';
 
 const api = axios.create({
@@ -12,22 +12,23 @@ const api = axios.create({
   },
 });
 
-// Interceptor para enviar o Token JWT automaticamente
+// Interceptor: Anexa o Token automaticamente
 api.interceptors.request.use((config) => {
   const userJson = localStorage.getItem('miner_user');
   if (userJson) {
     try {
       const user = JSON.parse(userJson);
-      // Se tiver token salvo, envia no header
       if (user.token) {
         config.headers.Authorization = `Bearer ${user.token}`;
       }
-    } catch (e) { console.error("Erro token", e); }
+    } catch (e) {
+      console.error("Erro ao ler token", e);
+    }
   }
   return config;
 });
 
-// --- HELPER FUNCTIONS (MANTIDAS) ---
+// --- HELPER FUNCTIONS ---
 export const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
@@ -35,98 +36,73 @@ export const formatCurrency = (value: number) => {
   }).format(value);
 };
 
-const randomInt = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
-
-// --- MOCK DATA GENERATOR (MANTIDO) ---
-const generateMockData = (count: number, filters: FilterState): Precatorio[] => {
-  const generatedData: Precatorio[] = [];
-  const tribunalList = filters.tribunal ? [filters.tribunal] : TRIBUNAIS;
-  const statusList: Precatorio['situacao'][] = ['Aguardando Pagamento', 'Pago', 'Em Processamento'];
-  const naturezas: Precatorio['natureza'][] = ['Alimentar', 'Comum'];
-  const ufs = filters.uf ? [filters.uf] : ESTADOS;
-  
-  const getOrgao = (tribunal: string) => {
-    if (tribunal.startsWith('TRF')) return 'União Federal';
-    if (tribunal === 'TJSP') return 'Fazenda do Estado de São Paulo';
-    return `Fazenda Pública Estadual (${tribunal.substring(2)})`;
-  };
-
-  for (let i = 1; i <= count; i++) {
-    const tribunal = tribunalList[Math.floor(Math.random() * tribunalList.length)];
-    const isFederal = tribunal.startsWith('TRF') || tribunal.startsWith('TRT');
-    const uf = ufs[Math.floor(Math.random() * ufs.length)];
-    let ano = filters.ano ? parseInt(filters.ano) : randomInt(2018, 2024);
-    let valor = randomInt(15000, 500000);
-    const cpf = filters.cpf || `${randomInt(100, 999)}.${randomInt(100, 999)}.${randomInt(100, 999)}-${randomInt(10, 99)}`;
-    const whatsapp = `+55 ${randomInt(11, 99)} 9${randomInt(9000, 9999)}-${randomInt(1000, 9999)}`;
-    const nome = filters.nomeTitular ? `${filters.nomeTitular} ${i}` : `Credor Simulado ${randomInt(1000, 9999)}`;
-    const processNum = `00${randomInt(10000, 99999)}-${randomInt(10, 99)}.${ano}.8.26.0000`;
-
-    generatedData.push({
-      id: `prec-mock-${i}`,
-      numeroProcesso: processNum,
-      numeroPrecatorio: `PRC${randomInt(10000, 99999)}/${ano}`,
-      tribunal: tribunal,
-      regiao: isFederal ? `${tribunal} Região` : 'Estadual',
-      ano: ano,
-      uf: uf,
-      natureza: naturezas[0],
-      nomeTitular: nome,
-      cpf: cpf,
-      whatsapp: whatsapp,
-      email: `mock.${nome.toLowerCase().replace(/ /g, '.')}@email.com`,
-      valor: valor,
-      situacao: statusList[0],
-      tipoProcesso: 'Ordinário',
-      orgao: getOrgao(tribunal),
-      loa: ano >= 2024 ? `LOA ${ano + 1}` : 'Anterior'
-    });
+// --- LOGIN REAL ---
+export const loginUser = async (email: string, password: string): Promise<User> => {
+  try {
+    const response = await api.post('/auth/login', { email, password });
+    const userData = response.data;
+    localStorage.setItem('miner_user', JSON.stringify(userData));
+    return userData;
+  } catch (error: any) {
+    console.error('Erro no login:', error);
+    if (error.code === "ERR_NETWORK") {
+      throw new Error('Erro de Conexão: O servidor Backend está desligado.');
+    }
+    if (error.response && error.response.status === 403) {
+       throw new Error('Email ou senha incorretos.');
+    }
+    throw new Error('Falha ao conectar com o servidor.');
   }
-  return generatedData;
 };
 
-// --- FUNÇÃO DE BUSCA INCREMENTADA (Conecta Real + Fallback) ---
+export const logoutUser = () => {
+  localStorage.removeItem('miner_user');
+  window.location.reload();
+};
+
+// --- BUSCA REAL (SEM MOCKS) ---
 export const searchPrecatorios = async (filters: FilterState, limit: number): Promise<Precatorio[]> => {
   try {
-    console.log("Tentando buscar no Servidor Java...");
-    // Tenta a API Real
+    console.log("Conectando ao Backend Java...");
+    
+    // Tenta buscar no servidor
     const response = await api.post('/precatorios/search', filters, {
-        params: { limit }
+      params: { limit }
     });
+
+    console.log("Dados recebidos:", response.data);
     return response.data;
 
   } catch (error: any) {
-    console.warn("API Offline ou Erro. Usando dados Mockados (Fallback).", error);
-    
-    // Se o erro for de saldo insuficiente, lança o erro para o usuário ver
-    if (error.response && error.response.status === 400) {
-        throw new Error(error.response.data || "Erro de validação ou saldo.");
+    console.error('Erro na mineração:', error);
+
+    // 1. Se o servidor estiver desligado (Network Error)
+    if (error.code === "ERR_NETWORK") {
+        throw new Error("Conexão Recusada: O Backend (Java) parece estar desligado ou inacessível na porta 8080.");
     }
 
-    // Se a API estiver desligada, usa o Mock que você pediu para manter
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const data = generateMockData(limit, filters);
-        resolve(data);
-      }, 1500); 
-    });
+    // 2. Erro de Sessão (Token Inválido)
+    if (error.response && error.response.status === 403) {
+        throw new Error("Sessão expirada. Faça login novamente.");
+    }
+
+    // 3. Erro de Saldo ou Regra de Negócio (Vem do Java)
+    if (error.response && error.response.data) {
+        // Se o Java mandou uma mensagem de texto, exibe ela
+        if (typeof error.response.data === 'string') {
+             throw new Error(error.response.data); 
+        }
+        // Se mandou JSON com campo 'message' ou 'error'
+        if (error.response.data.message) throw new Error(error.response.data.message);
+        if (error.response.data.error) throw new Error(error.response.data.error);
+    }
+
+    // 4. Erro genérico
+    throw new Error("Erro desconhecido ao buscar dados no servidor.");
   }
 };
 
-// --- LOGIN REAL INCREMENTADO ---
-export const loginUser = async (email: string, password: string): Promise<User> => {
-    try {
-        const response = await api.post('/auth/login', { email, password });
-        const userData = response.data;
-        localStorage.setItem('miner_user', JSON.stringify(userData));
-        return userData;
-    } catch (error) {
-        console.error("Erro login real", error);
-        throw new Error("Falha no login. Verifique servidor ou credenciais.");
-    }
-};
-
-// --- EXPORTAÇÃO EXCEL (MANTIDA) ---
+// --- EXPORTAÇÃO EXCEL ---
 export const exportToExcel = (data: Precatorio[]) => {
   const rows = data.map(item => ({
     "Número do Precatório": item.numeroPrecatorio,
@@ -156,14 +132,10 @@ export const exportToExcel = (data: Precatorio[]) => {
 
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, "Precatórios Extraídos");
-  const fileName = `Miner_Precatorios_Extracao_${new Date().toISOString().slice(0, 10)}.xlsx`;
-  XLSX.writeFile(workbook, fileName);
+  XLSX.writeFile(workbook, `Miner_Precatorios_${new Date().toISOString().slice(0, 10)}.xlsx`);
 };
 
 export const sendContactForm = async (data: any) => {
-    return new Promise((resolve) => {
-        setTimeout(() => {
-            resolve({ success: true, message: "Enviado com sucesso!" });
-        }, 1500);
-    });
+  // Apenas simulação de envio de email de contato
+  return new Promise((resolve) => setTimeout(resolve, 1000));
 };
