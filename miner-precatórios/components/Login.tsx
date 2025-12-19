@@ -1,7 +1,7 @@
-
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { User } from '../types';
-import { Lock, Mail } from 'lucide-react';
+import { Lock, Mail, Loader2 } from 'lucide-react';
 import Mascot from './Mascot';
 
 interface LoginProps {
@@ -9,61 +9,59 @@ interface LoginProps {
 }
 
 const Login: React.FC<LoginProps> = ({ onLogin }) => {
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setIsLoading(true);
 
-    const today = new Date().toLocaleDateString('pt-BR');
+    try {
+      const response = await fetch('http://localhost:8080/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: email, password: password }),
+      });
 
-    // Check Master Credentials
-    if (email === 'sachabm@gmail.com' && password === 'Sb7548$') {
-      onLogin({
-        email: email,
-        name: 'Sacha Master',
-        role: 'master',
-        credits: 99999,
-        stats: {
-          totalSearches: 0,
-          totalRecordsExtracted: 0,
-          joinDate: today
-        }
-      });
-    } else if (email && password) {
-      // Generic User Login Simulation
-      onLogin({
-        email: email,
-        name: email.split('@')[0],
-        role: 'user',
-        credits: 1000, // Start with 1000 credits (Plan 3 Months default)
-        stats: {
-          totalSearches: 0,
-          totalRecordsExtracted: 0,
-          joinDate: today
-        }
-      });
-    } else {
-      setError('Credenciais inválidas.');
+      if (response.ok) {
+        const data = await response.json();
+        localStorage.setItem('token', data.token);
+        
+        const userDate = new Date().toLocaleDateString('pt-BR');
+        const userData: User = {
+            email: data.email || email,
+            name: data.name || email.split('@')[0],
+            role: data.role || 'user',
+            credits: data.credits !== undefined ? data.credits : 0,
+            stats: {
+                totalSearches: data.totalSearches || 0,
+                totalRecordsExtracted: data.totalRecordsExtracted || 0,
+                joinDate: userDate
+            }
+        };
+
+        onLogin(userData);
+        navigate('/app'); 
+
+      } else {
+        setError('Login falhou. Verifique email e senha.');
+      }
+    } catch (err) {
+      console.error(err);
+      setError('Erro de conexão. Verifique se o backend está ligado.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleGoogleLogin = () => {
-    const today = new Date().toLocaleDateString('pt-BR');
-    // Simulation of Google Login
-    onLogin({
-      email: 'usuario_google@gmail.com',
-      name: 'Usuário Google',
-      role: 'user',
-      credits: 1000,
-      stats: {
-        totalSearches: 0,
-        totalRecordsExtracted: 0,
-        joinDate: today
-      }
-    });
+    alert("Login com Google será implementado em breve!");
   };
 
   return (
@@ -99,7 +97,8 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="pl-10 w-full border border-slate-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                // ADICIONADO: bg-white e text-slate-900 para garantir visibilidade
+                className="pl-10 w-full border border-slate-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all bg-white text-slate-900"
                 placeholder="seu@email.com"
                 required
               />
@@ -116,7 +115,8 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="pl-10 w-full border border-slate-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                // ADICIONADO: bg-white e text-slate-900
+                className="pl-10 w-full border border-slate-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all bg-white text-slate-900"
                 placeholder="********"
                 required
               />
@@ -125,9 +125,11 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
           <button
             type="submit"
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition-all shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+            disabled={isLoading}
+            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-bold py-3 rounded-lg transition-all shadow-md hover:shadow-lg transform hover:-translate-y-0.5 flex justify-center items-center gap-2"
           >
-            Entrar
+            {isLoading && <Loader2 className="animate-spin" size={20} />}
+            {isLoading ? 'Entrando...' : 'Entrar'}
           </button>
         </form>
 

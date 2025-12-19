@@ -1,7 +1,6 @@
-
 import React, { useState } from 'react';
 import { FilterState, Precatorio, TRIBUNAIS, ESTADOS, User } from '../types';
-import { searchPrecatorios, exportToExcel, formatCurrency } from '../services/precatorioService';
+import { exportToExcel, formatCurrency } from '../services/precatorioService';
 import { Download, Search, RefreshCw, Filter, AlertCircle } from 'lucide-react';
 import Mascot from './Mascot';
 
@@ -40,14 +39,21 @@ const Mining: React.FC<MiningProps> = ({ user, updateUser }) => {
     e.preventDefault();
     
     const limit = parseInt(quantity);
+    const token = localStorage.getItem('token'); // Recupera o token
+
+    if (!token) {
+        alert("Sessão expirada. Por favor, faça login novamente.");
+        return;
+    }
 
     if (!limit || limit <= 0) {
       alert("Por favor, insira uma quantidade válida de precatórios a extrair.");
       return;
     }
 
+    // Validação visual de créditos (o backend fará a validação final)
     if (limit > user.credits) {
-      alert(`Você não possui créditos suficientes para extrair ${limit} precatórios. Seus créditos atuais: ${user.credits}.`);
+      alert(`Você não possui créditos suficientes. Seus créditos: ${user.credits}. Necessários: ${limit}.`);
       return;
     }
 
@@ -56,18 +62,36 @@ const Mining: React.FC<MiningProps> = ({ user, updateUser }) => {
     setResults([]);
 
     try {
-      // Call search with strict limit
-      const data = await searchPrecatorios(filters, limit);
+      // === REQUISIÇÃO AO BACKEND ===
+      // Ajuste a URL abaixo se o seu Controller usar outro caminho (ex: /api/mining/extract)
+      const response = await fetch('http://localhost:8080/mining/extract', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}` // O Header que conecta tudo!
+        },
+        body: JSON.stringify({
+            ...filters,
+            limit: limit // Envia o limite desejado junto com os filtros
+        })
+      });
+
+      if (!response.ok) {
+          if (response.status === 403 || response.status === 401) {
+              throw new Error("Não autorizado. Verifique seus créditos ou faça login novamente.");
+          }
+          throw new Error("Erro no servidor ao processar mineração.");
+      }
+
+      const data: Precatorio[] = await response.json();
       
       if (data.length === 0) {
         alert("Nenhum dado retornado pelos tribunais com os filtros selecionados.");
-      }
+      } else {
+        setResults(data);
+        setHasSearched(true);
 
-      setResults(data);
-      setHasSearched(true);
-
-      // Deduct credits and update stats
-      if (data.length > 0) {
+        // Atualiza a interface com os novos créditos
         const newCredits = user.credits - data.length;
         const newStats = {
           ...user.stats,
@@ -81,9 +105,10 @@ const Mining: React.FC<MiningProps> = ({ user, updateUser }) => {
           stats: newStats
         });
       }
-    } catch (error) {
-      console.error("Erro na busca", error);
-      alert("Erro ao buscar precatórios. O tribunal pode estar temporariamente indisponível.");
+
+    } catch (error: any) {
+      console.error("Erro na busca:", error);
+      alert(error.message || "Erro ao buscar precatórios. Tente novamente.");
     } finally {
       setLoading(false);
     }
@@ -189,7 +214,7 @@ const Mining: React.FC<MiningProps> = ({ user, updateUser }) => {
                   value={filters.ano} 
                   onChange={handleFilterChange}
                   className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                  disabled={!!filters.loa} // Disable if LOA is selected to avoid conflict
+                  disabled={!!filters.loa} 
                 />
               </div>
 
@@ -352,7 +377,7 @@ const Mining: React.FC<MiningProps> = ({ user, updateUser }) => {
                  <div>
                    <h2 className="text-lg font-bold text-green-900">Extração Concluída com Sucesso!</h2>
                    <p className="text-sm text-green-700">
-                     {results.length} registros foram extraídos.
+                     {results.length} registros foram extraídos e debitados.
                    </p>
                  </div>
               </div>

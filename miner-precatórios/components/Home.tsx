@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { 
   Database, 
@@ -17,13 +16,15 @@ import {
   Landmark, 
   Tag, 
   Building2, 
-  Calendar 
+  Calendar,
+  ArrowRight // Adicionei este ícone que faltava
 } from 'lucide-react';
 import FAQ from './FAQ';
 import Mascot from './Mascot';
 
+// CORREÇÃO: O '?' torna a propriedade opcional, evitando erros se não for passada
 interface HomeProps {
-  onNavigate: (page: string) => void;
+  onNavigate?: (page: string) => void;
 }
 
 const Home: React.FC<HomeProps> = ({ onNavigate }) => {
@@ -35,6 +36,13 @@ const Home: React.FC<HomeProps> = ({ onNavigate }) => {
     interest: 'Assinatura'
   });
   const [formStatus, setFormStatus] = useState<'idle' | 'sending' | 'success'>('idle');
+
+  // Função auxiliar para navegar com segurança (caso onNavigate seja undefined)
+  const handleNav = (page: string) => {
+    if (onNavigate) {
+      onNavigate(page);
+    }
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -81,13 +89,13 @@ const Home: React.FC<HomeProps> = ({ onNavigate }) => {
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start">
                 <button 
-                  onClick={() => onNavigate('mining')}
-                  className="bg-yellow-500 hover:bg-yellow-400 text-slate-900 font-bold py-4 px-8 rounded-full transition-all transform hover:scale-105 shadow-lg shadow-yellow-500/20"
+                  onClick={() => handleNav('mining')}
+                  className="bg-yellow-500 hover:bg-yellow-400 text-slate-900 font-bold py-4 px-8 rounded-full transition-all transform hover:scale-105 shadow-lg shadow-yellow-500/20 flex items-center justify-center gap-2"
                 >
-                  Começar Mineração
+                  Começar Mineração <ArrowRight size={20} />
                 </button>
                 <button 
-                  onClick={() => onNavigate('pricing')}
+                  onClick={() => handleNav('pricing')}
                   className="bg-transparent border-2 border-slate-600 hover:border-white text-white font-bold py-4 px-8 rounded-full transition-all"
                 >
                   Ver Planos
@@ -188,9 +196,9 @@ const Home: React.FC<HomeProps> = ({ onNavigate }) => {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
-             
-             {/* Item 1 */}
-             <div className="bg-slate-50 p-6 rounded-xl border border-slate-100 flex items-center gap-4 hover:border-blue-300 transition-colors group">
+              
+              {/* Item 1 */}
+              <div className="bg-slate-50 p-6 rounded-xl border border-slate-100 flex items-center gap-4 hover:border-blue-300 transition-colors group">
                 <div className="bg-blue-100 p-3 rounded-lg text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors">
                   <FileText size={24} />
                 </div>
@@ -198,10 +206,10 @@ const Home: React.FC<HomeProps> = ({ onNavigate }) => {
                   <h4 className="font-bold text-slate-800 text-sm">Precatório e Processo</h4>
                   <p className="text-xs text-slate-500">Número completo</p>
                 </div>
-             </div>
+              </div>
 
-             {/* Item 2 */}
-             <div className="bg-slate-50 p-6 rounded-xl border border-slate-100 flex items-center gap-4 hover:border-blue-300 transition-colors group">
+              {/* Item 2 */}
+              <div className="bg-slate-50 p-6 rounded-xl border border-slate-100 flex items-center gap-4 hover:border-blue-300 transition-colors group">
                 <div className="bg-blue-100 p-3 rounded-lg text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors">
                   <UserCheck size={24} />
                 </div>
@@ -209,10 +217,10 @@ const Home: React.FC<HomeProps> = ({ onNavigate }) => {
                   <h4 className="font-bold text-slate-800 text-sm">Nome e CPF</h4>
                   <p className="text-xs text-slate-500">Dados do Titular</p>
                 </div>
-             </div>
+              </div>
 
-             {/* Item 3 */}
-             <div className="bg-slate-50 p-6 rounded-xl border border-slate-100 flex items-center gap-4 hover:border-blue-300 transition-colors group">
+              {/* Item 3 */}
+              <div className="bg-slate-50 p-6 rounded-xl border border-slate-100 flex items-center gap-4 hover:border-blue-300 transition-colors group">
                 <div className="bg-green-100 p-3 rounded-lg text-green-600 group-hover:bg-green-600 group-hover:text-white transition-colors">
                   <MessageCircle size={24} />
                 </div>
@@ -220,10 +228,10 @@ const Home: React.FC<HomeProps> = ({ onNavigate }) => {
                   <h4 className="font-bold text-slate-800 text-sm">WhatsApp e E-mail</h4>
                   <p className="text-xs text-slate-500">Contato direto</p>
                 </div>
-             </div>
+              </div>
 
-             {/* Item 4 */}
-             <div className="bg-slate-50 p-6 rounded-xl border border-slate-100 flex items-center gap-4 hover:border-blue-300 transition-colors group">
+              {/* Item 4 */}
+              <div className="bg-slate-50 p-6 rounded-xl border border-slate-100 flex items-center gap-4 hover:border-blue-300 transition-colors group">
                 <div className="bg-yellow-100 p-3 rounded-lg text-yellow-600 group-hover:bg-yellow-500 group-hover:text-white transition-colors">
                   <Banknote size={24} />
                 </div>
@@ -231,10 +239,10 @@ const Home: React.FC<HomeProps> = ({ onNavigate }) => {
                   <h4 className="font-bold text-slate-800 text-sm">Valor do Precatório</h4>
                   <p className="text-xs text-slate-500">Valor de face atualizado</p>
                 </div>
-             </div>
+              </div>
 
-             {/* Item 5 */}
-             <div className="bg-slate-50 p-6 rounded-xl border border-slate-100 flex items-center gap-4 hover:border-blue-300 transition-colors group">
+              {/* Item 5 */}
+              <div className="bg-slate-50 p-6 rounded-xl border border-slate-100 flex items-center gap-4 hover:border-blue-300 transition-colors group">
                 <div className="bg-slate-200 p-3 rounded-lg text-slate-600 group-hover:bg-slate-800 group-hover:text-white transition-colors">
                   <Landmark size={24} />
                 </div>
@@ -242,10 +250,10 @@ const Home: React.FC<HomeProps> = ({ onNavigate }) => {
                   <h4 className="font-bold text-slate-800 text-sm">Tribunal e Região</h4>
                   <p className="text-xs text-slate-500">TRFs, TJs e TRTs</p>
                 </div>
-             </div>
+              </div>
 
-             {/* Item 6 */}
-             <div className="bg-slate-50 p-6 rounded-xl border border-slate-100 flex items-center gap-4 hover:border-blue-300 transition-colors group">
+              {/* Item 6 */}
+              <div className="bg-slate-50 p-6 rounded-xl border border-slate-100 flex items-center gap-4 hover:border-blue-300 transition-colors group">
                 <div className="bg-slate-200 p-3 rounded-lg text-slate-600 group-hover:bg-slate-800 group-hover:text-white transition-colors">
                   <Tag size={24} />
                 </div>
@@ -253,10 +261,10 @@ const Home: React.FC<HomeProps> = ({ onNavigate }) => {
                   <h4 className="font-bold text-slate-800 text-sm">Status e Natureza</h4>
                   <p className="text-xs text-slate-500">Alimentar ou Comum</p>
                 </div>
-             </div>
+              </div>
 
-             {/* Item 7 */}
-             <div className="bg-slate-50 p-6 rounded-xl border border-slate-100 flex items-center gap-4 hover:border-blue-300 transition-colors group">
+              {/* Item 7 */}
+              <div className="bg-slate-50 p-6 rounded-xl border border-slate-100 flex items-center gap-4 hover:border-blue-300 transition-colors group">
                 <div className="bg-slate-200 p-3 rounded-lg text-slate-600 group-hover:bg-slate-800 group-hover:text-white transition-colors">
                   <Building2 size={24} />
                 </div>
@@ -264,10 +272,10 @@ const Home: React.FC<HomeProps> = ({ onNavigate }) => {
                   <h4 className="font-bold text-slate-800 text-sm">Órgão Responsável</h4>
                   <p className="text-xs text-slate-500">Entidade Devedora</p>
                 </div>
-             </div>
+              </div>
 
-             {/* Item 8 */}
-             <div className="bg-slate-50 p-6 rounded-xl border border-slate-100 flex items-center gap-4 hover:border-blue-300 transition-colors group">
+              {/* Item 8 */}
+              <div className="bg-slate-50 p-6 rounded-xl border border-slate-100 flex items-center gap-4 hover:border-blue-300 transition-colors group">
                 <div className="bg-slate-200 p-3 rounded-lg text-slate-600 group-hover:bg-slate-800 group-hover:text-white transition-colors">
                   <Calendar size={24} />
                 </div>
@@ -275,7 +283,7 @@ const Home: React.FC<HomeProps> = ({ onNavigate }) => {
                   <h4 className="font-bold text-slate-800 text-sm">Ano de Expedição</h4>
                   <p className="text-xs text-slate-500">Ano Base / LOA</p>
                 </div>
-             </div>
+              </div>
 
           </div>
         </div>
@@ -293,7 +301,7 @@ const Home: React.FC<HomeProps> = ({ onNavigate }) => {
            </div>
            <div>
              <button 
-               onClick={() => onNavigate('pricing')}
+               onClick={() => handleNav('pricing')}
                className="bg-yellow-500 text-slate-900 font-bold py-4 px-8 rounded-lg hover:bg-yellow-400 transition-colors shadow-lg"
              >
                Ver Preços
