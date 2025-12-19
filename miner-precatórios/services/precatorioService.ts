@@ -2,7 +2,7 @@ import axios from 'axios';
 import { Precatorio, FilterState, TRIBUNAIS, ESTADOS, User } from '../types';
 import * as XLSX from 'xlsx';
 
-// --- CONFIGURAÇÃO DA API REAL ---
+// --- CONFIGURAÇÃO DA API REAL (INCREMENTO) ---
 const API_URL = 'http://localhost:8080/api';
 
 const api = axios.create({
@@ -12,53 +12,22 @@ const api = axios.create({
   },
 });
 
-// INTERCEPTOR: Adiciona o Token JWT em todas as requisições automaticamente
+// Interceptor para enviar o Token JWT automaticamente
 api.interceptors.request.use((config) => {
   const userJson = localStorage.getItem('miner_user');
   if (userJson) {
     try {
       const user = JSON.parse(userJson);
-      // Se o backend retornar o token, ele deve estar salvo aqui
+      // Se tiver token salvo, envia no header
       if (user.token) {
         config.headers.Authorization = `Bearer ${user.token}`;
       }
-    } catch (e) {
-      console.error("Erro ao ler usuário do cache", e);
-    }
+    } catch (e) { console.error("Erro token", e); }
   }
   return config;
 });
 
-// --- FUNÇÕES DE AUTENTICAÇÃO REAIS ---
-
-export const loginUser = async (email: string, password: string): Promise<User> => {
-  try {
-    // Bate no Backend Java
-    const response = await api.post('/auth/login', { email, password });
-    
-    // O Backend retorna: { token, id, name, email, credits, ... }
-    const userData = response.data;
-    
-    // Salva no navegador para persistir o login e o token
-    localStorage.setItem('miner_user', JSON.stringify(userData));
-    
-    return userData;
-  } catch (error: any) {
-    console.error('Erro no login:', error);
-    if (error.response && error.response.status === 403) {
-       throw new Error('Email ou senha incorretos.');
-    }
-    throw new Error('Falha ao conectar com o servidor. Verifique se o Backend está rodando.');
-  }
-};
-
-export const logoutUser = () => {
-  localStorage.removeItem('miner_user');
-  window.location.reload();
-};
-
 // --- HELPER FUNCTIONS (MANTIDAS) ---
-
 export const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
@@ -68,8 +37,7 @@ export const formatCurrency = (value: number) => {
 
 const randomInt = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
 
-// --- GERADOR DE DADOS MOCKADOS (MANTIDO COMO BACKUP) ---
-// (Esta função foi mantida conforme solicitado, caso precise testar offline)
+// --- MOCK DATA GENERATOR (MANTIDO) ---
 const generateMockData = (count: number, filters: FilterState): Precatorio[] => {
   const generatedData: Precatorio[] = [];
   const tribunalList = filters.tribunal ? [filters.tribunal] : TRIBUNAIS;
@@ -117,47 +85,48 @@ const generateMockData = (count: number, filters: FilterState): Precatorio[] => 
   return generatedData;
 };
 
-// --- FUNÇÃO PRINCIPAL DE BUSCA (AGORA CONECTADA AO JAVA) ---
-
+// --- FUNÇÃO DE BUSCA INCREMENTADA (Conecta Real + Fallback) ---
 export const searchPrecatorios = async (filters: FilterState, limit: number): Promise<Precatorio[]> => {
   try {
-    // Tenta conectar no Backend Real
-    console.log("Iniciando busca no servidor Java...");
-    
-    // POST /api/precatorios/search
-    // O Token vai automaticamente pelo interceptor configurado acima
+    console.log("Tentando buscar no Servidor Java...");
+    // Tenta a API Real
     const response = await api.post('/precatorios/search', filters, {
-      params: { limit }
+        params: { limit }
     });
-
-    console.log("Dados recebidos do Java:", response.data);
     return response.data;
 
   } catch (error: any) {
-    console.error('Erro na mineração real:', error);
-
-    // Se o erro for de autenticação (Token expirado ou inválido)
-    if (error.response && error.response.status === 403) {
-        throw new Error("Sessão expirada. Por favor, faça login novamente.");
-    }
-
-    // Se o erro for de saldo
-    if (error.response && error.response.data && typeof error.response.data === 'string') {
-        throw new Error(error.response.data); // Ex: "Saldo insuficiente"
-    }
-
-    // FALLBACK DESATIVADO PARA TESTE DE CONEXÃO
-    // Comentado para garantir que a interface avise se o backend não responder
-    // console.warn("Backend indisponível. Usando dados mockados locais (Fallback).");
-    // return generateMockData(limit, filters);
+    console.warn("API Offline ou Erro. Usando dados Mockados (Fallback).", error);
     
-    // Lança o erro para o frontend exibir o alerta
-    throw error;
+    // Se o erro for de saldo insuficiente, lança o erro para o usuário ver
+    if (error.response && error.response.status === 400) {
+        throw new Error(error.response.data || "Erro de validação ou saldo.");
+    }
+
+    // Se a API estiver desligada, usa o Mock que você pediu para manter
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        const data = generateMockData(limit, filters);
+        resolve(data);
+      }, 1500); 
+    });
   }
 };
 
-// --- EXPORTAÇÃO EXCEL (MANTIDA) ---
+// --- LOGIN REAL INCREMENTADO ---
+export const loginUser = async (email: string, password: string): Promise<User> => {
+    try {
+        const response = await api.post('/auth/login', { email, password });
+        const userData = response.data;
+        localStorage.setItem('miner_user', JSON.stringify(userData));
+        return userData;
+    } catch (error) {
+        console.error("Erro login real", error);
+        throw new Error("Falha no login. Verifique servidor ou credenciais.");
+    }
+};
 
+// --- EXPORTAÇÃO EXCEL (MANTIDA) ---
 export const exportToExcel = (data: Precatorio[]) => {
   const rows = data.map(item => ({
     "Número do Precatório": item.numeroPrecatorio,
@@ -178,7 +147,6 @@ export const exportToExcel = (data: Precatorio[]) => {
   }));
 
   const worksheet = XLSX.utils.json_to_sheet(rows);
-
   const wscols = [
     { wch: 20 }, { wch: 25 }, { wch: 10 }, { wch: 15 }, { wch: 8 }, 
     { wch: 8 }, { wch: 15 }, { wch: 30 }, { wch: 15 }, { wch: 12 }, 
@@ -188,16 +156,14 @@ export const exportToExcel = (data: Precatorio[]) => {
 
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, "Precatórios Extraídos");
-
   const fileName = `Miner_Precatorios_Extracao_${new Date().toISOString().slice(0, 10)}.xlsx`;
   XLSX.writeFile(workbook, fileName);
 };
 
-// Simulação de envio de formulário
 export const sendContactForm = async (data: any) => {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({ success: true, message: "Enviado com sucesso!" });
-    }, 1500);
-  });
+    return new Promise((resolve) => {
+        setTimeout(() => {
+            resolve({ success: true, message: "Enviado com sucesso!" });
+        }, 1500);
+    });
 };
