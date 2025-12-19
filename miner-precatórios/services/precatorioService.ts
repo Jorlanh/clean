@@ -146,11 +146,13 @@ export const searchPrecatorios = async (filters: FilterState, limit: number): Pr
         throw new Error(error.response.data); // Ex: "Saldo insuficiente"
     }
 
-    // FALLBACK (Opcional): Se o backend estiver desligado, usa os dados mockados 
-    // para não quebrar a apresentação, mas avisa no console.
-    // Se quiser DESATIVAR o fallback e mostrar erro, comente as linhas abaixo.
-    console.warn("Backend indisponível. Usando dados mockados locais (Fallback).");
-    return generateMockData(limit, filters);
+    // FALLBACK DESATIVADO PARA TESTE DE CONEXÃO
+    // Comentado para garantir que a interface avise se o backend não responder
+    // console.warn("Backend indisponível. Usando dados mockados locais (Fallback).");
+    // return generateMockData(limit, filters);
+    
+    // Lança o erro para o frontend exibir o alerta
+    throw error;
   }
 };
 
